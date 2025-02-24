@@ -1,0 +1,135 @@
+import random
+from typing import Dict, List, Set
+
+
+class Production:
+    def __init__(self, non_terminal: str, result: str):
+        self.non_terminal = non_terminal
+        self.result = result
+
+
+class Grammar:
+    def __init__(self):
+        # Initialize the grammar with the given specification
+        self.non_terminals = {"S", "D", "E", "J"}
+        self.terminals = {"a", "b", "c", "d", "e"}
+        self.start_symbol = "S"
+        self.random = random.Random()
+
+        self.productions = [
+            Production("S", "aD"),
+            Production("D", "dE"),
+            Production("D", "bJ"),
+            Production("D", "aE"),
+            Production("J", "cS"),
+            Production("E", "e"),
+            Production("E", "aE")
+        ]
+
+    def generate_string(self, max_depth=10):
+        return self.generate_from_symbol(self.start_symbol, max_depth)
+
+    def generate_from_symbol(self, symbol, depth):
+        if depth <= 0:
+            return ""
+        
+        # If symbol is terminal, return it
+        if symbol in self.terminals:
+            return symbol
+
+        # Get all productions for this non-terminal
+        valid_productions = [p for p in self.productions if p.non_terminal == symbol]
+        if not valid_productions:
+            return ""
+
+        # Choose random production
+        production = valid_productions[self.random.randint(0, len(valid_productions) - 1)]
+        result = ""
+
+        # Process each symbol in the production result
+        for c in production.result:
+            result += self.generate_from_symbol(c, depth - 1)
+
+        return result
+
+    def to_finite_automaton(self):
+        # Convert regular grammar to finite automaton
+        states = set(self.non_terminals)
+        states.add("F")  # Final state
+        
+        transitions = {}
+        
+        # Initialize transitions dictionary
+        for state in states:
+            transitions[state] = {}
+
+        # Convert productions to transitions
+        for production in self.productions:
+            current_state = production.non_terminal
+            result = production.result
+
+            if len(result) == 1 and result in self.terminals:
+                # Handle terminal-only productions
+                if result not in transitions[current_state]:
+                    transitions[current_state][result] = set()
+                transitions[current_state][result].add("F")
+            elif len(result) == 2:
+                # Handle productions with terminal + non-terminal
+                terminal = result[0]
+                next_state = result[1]
+                
+                if terminal not in transitions[current_state]:
+                    transitions[current_state][terminal] = set()
+                transitions[current_state][terminal].add(next_state)
+
+        return FiniteAutomaton(states, self.terminals, transitions, self.start_symbol, {"F"})
+
+
+class FiniteAutomaton:
+    def __init__(self, states, alphabet, transitions, initial_state, final_states):
+        self.states = states
+        self.alphabet = alphabet
+        self.transitions = transitions
+        self.initial_state = initial_state
+        self.final_states = final_states
+
+    def string_belong_to_language(self, input_string):
+        current_states = {self.initial_state}
+
+        for symbol in input_string:
+            next_states = set()
+            
+            for state in current_states:
+                if state in self.transitions and symbol in self.transitions[state]:
+                    for next_state in self.transitions[state][symbol]:
+                        next_states.add(next_state)
+
+            if not next_states:
+                return False
+            current_states = next_states
+
+        # Check if any current state is a final state
+        return bool(current_states.intersection(self.final_states))
+
+
+# Main function to demonstrate usage
+def main():
+    grammar = Grammar()
+
+    # Generate 5 valid strings
+    print("Generated strings from grammar:")
+    for i in range(5):
+        print(grammar.generate_string())
+
+    # Convert grammar to finite automaton
+    automaton = grammar.to_finite_automaton()
+
+    # Test some strings
+    test_strings = ["ade", "abcade", "abadе", "adaae"]
+    print("\nTesting strings with finite automaton:")
+    for string in test_strings:
+        print(f"String '{string}' belongs to language: {automaton.string_belong_to_language(string)}")
+
+
+if __name__ == "__main__":
+    main()
